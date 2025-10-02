@@ -5,6 +5,8 @@ pipeline{
     parameters {
         // Pipeline parameters are automatically filled by LT Trigger plugin
             string(name: 'ApplicationScope', defaultValue: 'https://cmiti-dev.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
+            string(name: 'ApplicationScopeWithTests', defaultValue: 'https://cmiti-tst.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy (including test applications)')
+            string(name: 'TriggeredBy', defaultValue: 'Reynor Carta', description: 'Name of LifeTime user that triggered the pipeline remotely.')
     }
 
     options {
@@ -48,6 +50,16 @@ pipeline{
                         sh script: "pip3 install -U outsystems-pipeline==\"${env.OSPackageVersion}\"", label: 'Install required packages'
                      }
             }
+        }
+
+        stage('Get the latest tags') {
+              steps {
+                withPythonEnv('python3') {
+                  echo "Pipeline run triggered remotely by '${params.TriggeredBy}' for the following applications (including tests): '${params.ApplicationScopeWithTests}'"
+                  // Retrieve the Applications and Environment details from LifeTime
+                  sh script: "python3 -m outsystems.pipeline.fetch_lifetime_data --artifacts \"${env.ArtifactsFolder}\" --lt_url ${env.LifeTimeHostname} --lt_token ${env.AuthorizationToken} --lt_api_version ${env.LifeTimeAPIVersion}", label: 'Retrieve list of Environments and Applications'
+                }
+              }
         }
     }
 

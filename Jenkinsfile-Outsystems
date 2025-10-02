@@ -37,6 +37,7 @@ pipeline{
                      }
             }
         }
+    }
 
         post {
             // It will always store the cache files generated, for observability purposes, and notifies the result
@@ -60,5 +61,4 @@ pipeline{
                   }
               }
         }
-    }
 }

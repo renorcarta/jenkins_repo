@@ -57,19 +57,16 @@ pipeline{
             withPythonEnv('python3') {
               echo "Pipeline run triggered remotely by '${params.TriggeredBy}' for the following applications (including tests): '${params.ApplicationScopeWithTests}'"
 
-              // Retrieve Environments and Applications
-              withEnv([
-                "ARTIFACTS_FOLDER=${env.ArtifactsFolder}",
-                "LT_URL=${env.LifeTimeHostname}",
-                "LT_TOKEN=${env.AuthorizationToken}",
-                "LT_API_VERSION=${env.LifeTimeAPIVersion}"
-              ]) {
+              // Use withCredentials to safely inject AuthorizationToken
+              withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
+
+                // First shell command
                 sh label: 'Retrieve list of Environments and Applications', script: '''
                   python3 -m outsystems.pipeline.fetch_lifetime_data \
-                    --artifacts "$ARTIFACTS_FOLDER" \
-                    --lt_url "$LT_URL" \
+                    --artifacts "$ArtifactsFolder" \
+                    --lt_url "$LifeTimeHostname" \
                     --lt_token "$LT_TOKEN" \
-                    --lt_api_version "$LT_API_VERSION"
+                    --lt_api_version "$LifeTimeAPIVersion"
                 '''
               }
             }

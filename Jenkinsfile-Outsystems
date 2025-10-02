@@ -4,7 +4,7 @@ pipeline{
 
     parameters {
         // Pipeline parameters are automatically filled by LT Trigger plugin
-            string(name: 'ApplicationScope', defaultValue: '', description: 'Comma-separated list of LifeTime applications to deploy.')
+            string(name: 'ApplicationScope', defaultValue: 'https://cmiti-lt.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
     }
 
     options {
@@ -51,26 +51,29 @@ pipeline{
         }
     }
 
-        post {
-            // It will always store the cache files generated, for observability purposes, and notifies the result
-             always {
-                dir ("${env.ArtifactsFolder}") {
-                    archiveArtifacts artifacts: "**/*.cache"
-                }
-             }
+    post {
+        always {
+            dir("${env.ArtifactsFolder}") {
+                // Debug: list files for observability
+                sh 'echo "Listing contents of ArtifactsFolder:" && ls -la || true'
 
-             // If there's a failure, tries to store the Deployment conflicts (if exists), for troubleshooting purposes
-              failure {
-                 dir ("${env.ArtifactsFolder}") {
-                     archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
-                 }
-              }
-
-              // Delete artifacts folder content
-              cleanup {
-                  dir ("${env.ArtifactsFolder}") {
-                      deleteDir()
-                  }
-              }
+                // Archive .cache files if any; don't fail if none found
+                archiveArtifacts artifacts: '**/*.cache', allowEmptyArchive: true
+            }
         }
+
+        failure {
+            dir("${env.ArtifactsFolder}") {
+                // Archive DeploymentConflicts folder/files if exists, but don't fail if empty
+                archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
+            }
+        }
+
+        cleanup {
+            dir("${env.ArtifactsFolder}") {
+                // Clean up artifacts folder contents
+                deleteDir()
+            }
+        }
+    }
 }

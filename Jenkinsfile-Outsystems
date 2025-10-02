@@ -22,6 +22,9 @@ pipeline{
 
        // Environments Specification Variables
             DevelopmentEnvironment = 'https://cmiti-dev.outsystemsenterprise.com/'
+
+       // OutSystems PyPI package version
+                OSPackageVersion = '0.10.1'
     }
 
     stages {

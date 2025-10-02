@@ -2,13 +2,15 @@ pipeline {
     agent any
 
     environment {
-        AUTH_TOKEN = credentials('LifeTimeServiceAccountToken')
+        GITHUB_TOKEN = credentials('LifeTimeServiceAccountToken')
     }
 
     stages {
-        stage('Use Token') {
+        stage('List GitHub Repos') {
             steps {
-                sh 'echo "The token is $AUTH_TOKEN"'
+                sh '''
+                    curl -H "Authorization: token $GITHUB_TOKEN" https://github.com/renorcarta/jenkins_repo
+                '''
             }
         }
     }

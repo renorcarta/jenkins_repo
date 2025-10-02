@@ -52,50 +52,26 @@ pipeline{
             }
         }
 
-        stage('Get and Deploy Latest Tags') {
+        stage('Get the latest tags') {
           steps {
             withPythonEnv('python3') {
               echo "Pipeline run triggered remotely by '${params.TriggeredBy}' for the following applications (including tests): '${params.ApplicationScopeWithTests}'"
 
-              // Retrieve the Applications and Environment details from LifeTime
-              sh script: '''
-                python3 -m outsystems.pipeline.fetch_lifetime_data \
-                  --artifacts "$ArtifactsFolder" \
-                  --lt_url "$LifeTimeHostname" \
-                  --lt_token "$AuthorizationToken" \
-                  --lt_api_version "$LifeTimeAPIVersion"
-              ''',
-              label: 'Retrieve list of Environments and Applications',
-              environment: [
-                ArtifactsFolder: env.ArtifactsFolder,
-                LifeTimeHostname: env.LifeTimeHostname,
-                AuthorizationToken: env.AuthorizationToken,
-                LifeTimeAPIVersion: env.LifeTimeAPIVersion
-              ]
-
-              // Deploy the application list, with tests, to the Regression environment
-              /*lock('deployment-plan-REG') {
-                sh script: '''
-                  python3 -m outsystems.pipeline.deploy_latest_tags_to_target_env \
-                    --artifacts "$ArtifactsFolder" \
-                    --lt_url "$LifeTimeHostname" \
-                    --lt_token "$AuthorizationToken" \
-                    --lt_api_version "$LifeTimeAPIVersion" \
-                    --source_env "$DevelopmentEnvironment" \
-                    --destination_env "$RegressionEnvironment" \
-                    --app_list "$ApplicationScopeWithTests"
-                ''',
-                label: "Deploy latest application tags (including tests) to $RegressionEnvironment",
-                environment: [
-                  ArtifactsFolder: env.ArtifactsFolder,
-                  LifeTimeHostname: env.LifeTimeHostname,
-                  AuthorizationToken: env.AuthorizationToken,
-                  LifeTimeAPIVersion: env.LifeTimeAPIVersion,
-                  DevelopmentEnvironment: env.DevelopmentEnvironment,
-                  RegressionEnvironment: env.RegressionEnvironment,
-                  ApplicationScopeWithTests: params.ApplicationScopeWithTests
-                ]
-              }*/
+              // Retrieve Environments and Applications
+              withEnv([
+                "ARTIFACTS_FOLDER=${env.ArtifactsFolder}",
+                "LT_URL=${env.LifeTimeHostname}",
+                "LT_TOKEN=${env.AuthorizationToken}",
+                "LT_API_VERSION=${env.LifeTimeAPIVersion}"
+              ]) {
+                sh label: 'Retrieve list of Environments and Applications', script: '''
+                  python3 -m outsystems.pipeline.fetch_lifetime_data \
+                    --artifacts "$ARTIFACTS_FOLDER" \
+                    --lt_url "$LT_URL" \
+                    --lt_token "$LT_TOKEN" \
+                    --lt_api_version "$LT_API_VERSION"
+                '''
+              }
             }
           }
         }

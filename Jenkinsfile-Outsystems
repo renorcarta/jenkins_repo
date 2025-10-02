@@ -4,7 +4,7 @@ pipeline{
 
     parameters {
         // Pipeline parameters are automatically filled by LT Trigger plugin
-            string(name: 'ApplicationScope', defaultValue: 'https://cmiti-lt.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
+            string(name: 'ApplicationScope', defaultValue: 'https://cmiti-dev.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
     }
 
     options {
@@ -71,7 +71,7 @@ pipeline{
 
         cleanup {
             dir("${env.ArtifactsFolder}") {
-                // Clean up artifacts folder contents
+              // Clean up artifacts folder contents
                 deleteDir()
             }
         }

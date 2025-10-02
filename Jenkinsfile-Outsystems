@@ -71,7 +71,7 @@ pipeline{
 
         cleanup {
             dir("${env.ArtifactsFolder}") {
-                // Clean up artifacts folder contents
+              // Clean up artifacts folder contents
                 deleteDir()
             }
         }

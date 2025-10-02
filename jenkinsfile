@@ -11,7 +11,7 @@ pipeline {
                 sh '''
                     curl -X GET \
                         -H "Authorization: Bearer $AuthorizationToken" \
-                        https://cmiti-lt.outsystemsenterprise.com/lifetimeapi/v1/environments
+                        https://cmiti-lt.outsystemsenterprise.com/lifetimeapi/rest/v2/environments/
                 '''
             }
         }

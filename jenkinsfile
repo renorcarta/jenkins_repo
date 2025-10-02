@@ -2,14 +2,16 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('LifeTimeServiceAccountToken')
+        AuthorizationToken = credentials('LifeTimeServiceAccountToken')
     }
 
     stages {
-        stage('List GitHub Repos') {
+        stage('Call OutSystems API') {
             steps {
                 sh '''
-                    curl -H "Authorization: token $GITHUB_TOKEN" https://github.com/renorcarta/jenkins_repo
+                    curl -X GET \
+                        -H "Authorization: Bearer $AuthorizationToken" \
+                        https://cmiti-lt.outsystemsenterprise.com/lifetimeapi/v1/environments
                 '''
             }
         }

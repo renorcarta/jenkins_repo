@@ -30,7 +30,11 @@ pipeline{
                 // Create folder for storing artifacts
                     sh script: "mkdir ${env.ArtifactsFolder}", label: 'Create artifacts folder'
                 // Only the virtual environment needs to be installed at the system level
-                   sh script: 'pip3 install -q -I virtualenv --user', label: 'Install Python virtual environments'
+                // sh script: 'pip3 install -q -I virtualenv --user', label: 'Install Python virtual environments'
+                    sh script: 'python3 -m venv venv
+                                    . venv/bin/activate
+                                    pip install virtualenv
+                                ', label: 'Install Python virtual environments'
                 // Install the rest of the dependencies at the environment level and not the system level
                      withPythonEnv('python3'){
                         sh script: "pip3 install -U outsystems-pipeline==\"${env.OSPackageVersion}\"", label: 'Install required packages'

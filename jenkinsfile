@@ -1,0 +1,15 @@
+pipeline {
+    agent any
+
+    environment {
+        AUTH_TOKEN = credentials('LifeTimeServiceAccountToken')
+    }
+
+    stages {
+        stage('Use Token') {
+            steps {
+                sh 'echo "The token is $AUTH_TOKEN"'
+            }
+        }
+    }
+}

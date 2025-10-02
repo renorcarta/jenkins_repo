@@ -1,0 +1,64 @@
+pipeline{
+    // Replace by specific label for narrowing down to OutSystems pipeline-specific agents. A dedicated agent will be allocated for the entire pipeline run.
+        agent any
+
+    parameters {
+        // Pipeline parameters are automatically filled by LT Trigger plugin
+            string(name: 'ApplicationScope', defaultValue: '', description: 'Comma-separated list of LifeTime applications to deploy.')
+    }
+
+    options {
+        skipStagesAfterUnstable()
+    }
+
+    environment {
+        // Artifacts Folder
+            ArtifactsFolder = "Artifacts"
+        // LifeTime Specific Variables
+           LifeTimeHostname = 'https://cmiti-lt.outsystemsenterprise.com/'
+           LifeTimeAPIVersion = 2
+        // Authentication Specific Variables
+            AuthorizationToken = credentials('LifeTimeServiceAccountToken')
+
+       // Environments Specification Variables
+            DevelopmentEnvironment = 'https://cmiti-dev.outsystemsenterprise.com/'
+    }
+
+    stages {
+        stage ('Install Python Dependencies') {
+            steps {
+                // Create folder for storing artifacts
+                    sh script: "mkdir ${env.ArtifactsFolder}", label: 'Create artifacts folder'
+                // Only the virtual environment needs to be installed at the system level
+                   sh script: 'pip3 install -q -I virtualenv --user', label: 'Install Python virtual environments'
+                // Install the rest of the dependencies at the environment level and not the system level
+                     withPythonEnv('python3'){
+                        sh script: "pip3 install -U outsystems-pipeline==\"${env.OSPackageVersion}\"", label: 'Install required packages'
+                     }
+            }
+        }
+
+        post {
+            // It will always store the cache files generated, for observability purposes, and notifies the result
+             always {
+                dir ("${env.ArtifactsFolder}") {
+                    archiveArtifacts artifacts: "**/*.cache"
+                }
+             }
+
+             // If there's a failure, tries to store the Deployment conflicts (if exists), for troubleshooting purposes
+              failure {
+                 dir ("${env.ArtifactsFolder}") {
+                     archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
+                 }
+              }
+
+              // Delete artifacts folder content
+              cleanup {
+                  dir ("${env.ArtifactsFolder}") {
+                      deleteDir()
+                  }
+              }
+        }
+    }
+}

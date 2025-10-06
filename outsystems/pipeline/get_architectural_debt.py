@@ -7,16 +7,17 @@ import os
 import requests
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Get architectural debt from LifeTime/Architecture Dashboard")
+    parser = argparse.ArgumentParser(description="Get architectural debt from LifeTime and Architecture Dashboard")
     parser.add_argument("--app_name", required=True, help="Name of the OutSystems app")
-    parser.add_argument("--artifacts", required=True, help="Path to artifacts folder containing applications.json")
+    parser.add_argument("--artifacts", required=True, help="Path to artifacts folder containing applications.cache")
     parser.add_argument("--lifetime_host", required=True, help="Base URL of LifeTime (e.g. https://lt.example.com)")
+    parser.add_argument("--arch_dashboard_host", required=True, help="Base URL of Architecture Dashboard (e.g. https://aimentorstudio.outsystems.com)")
     parser.add_argument("--token", required=True, help="Personal Access Token or Service Account token")
     parser.add_argument("--output", required=True, help="Output file path for the results (e.g. ./arch-debt.json)")
     return parser.parse_args()
 
 def load_applications(artifacts_path):
-    apps_path = os.path.join(artifacts_path, "applications.cache")  # previously applications.json
+    apps_path = os.path.join(artifacts_path, "applications.cache")
     if not os.path.isfile(apps_path):
         print(f"❌ Applications file not found at {apps_path}")
         sys.exit(1)
@@ -37,15 +38,22 @@ def get_app_by_name(apps, target_name):
             return app
     return None
 
-def get_architecture_metrics(app_id, lifetime_host, token):
-    url = f"{lifetime_host}/architecture-dashboardapi/applications/{app_id}/metrics"
+def get_architecture_metrics(app_id, arch_dashboard_host, token):
+    # Use the Architecture Dashboard host (separate from LifeTime)
+    url = f"{arch_dashboard_host}/api/applications/{app_id}/metrics"  # Adjust the path based on your Architecture Dashboard API
     headers = {
         "Authorization": f"Bearer {token}"
     }
+
+    print(f"[DEBUG] Requesting Architecture Metrics from: {url}")
+
     response = requests.get(url, headers=headers)
+
     if response.status_code != 200:
         print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code}")
+        print(f"➡️ Response content:\n{response.text}")
         sys.exit(1)
+
     return response.json()
 
 def main():
@@ -57,7 +65,7 @@ def main():
     print(f"🔍 Searching for application '{args.app_name}'...")
     app = get_app_by_name(apps, args.app_name)
     if not app:
-        print(f"❌ Application '{args.app_name}' not found in applications.json")
+        print(f"❌ Application '{args.app_name}' not found in applications.cache")
         sys.exit(1)
 
     app_id = app.get("Key")
@@ -65,7 +73,7 @@ def main():
     print(f"📦 Found application: {app_name} (ID: {app_id})")
 
     print(f"📊 Fetching architecture metrics for app ID {app_id}...")
-    metrics = get_architecture_metrics(app_id, args.lifetime_host, args.token)
+    metrics = get_architecture_metrics(app_id, args.arch_dashboard_host, args.token)
 
     result = {
         "application_id": app_id,

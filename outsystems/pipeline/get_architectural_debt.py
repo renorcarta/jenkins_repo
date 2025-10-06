@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import requests
+from urllib.parse import urljoin
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Get architectural debt from LifeTime/Architecture Dashboard")
@@ -14,7 +15,9 @@ def parse_args():
     return parser.parse_args()
 
 def fetch_app_list(lifetime_host, token):
-    url = f"{lifetime_host}/lifetimeapi/v2/applications"
+    url = urljoin(lifetime_host.rstrip('/') + '/', "lifetimeapi/v2/applications")
+    print(f"[DEBUG] Fetching applications list from: {url}")
+
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -22,7 +25,7 @@ def fetch_app_list(lifetime_host, token):
     response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
-        print(f"❌ Failed to fetch application list. HTTP {response.status_code}")
+        print(f"❌ Failed to fetch application list. HTTP {response.status_code} from {url}")
         sys.exit(1)
 
     return response.json()
@@ -34,8 +37,9 @@ def get_app_by_name(apps, target_name):
     return None
 
 def get_architecture_metrics(app_id, lifetime_host, token):
-    # Hypothetical endpoint for architecture metrics
-    url = f"{lifetime_host}/architecture-dashboardapi/applications/{app_id}/metrics"
+    url = urljoin(lifetime_host.rstrip('/') + '/', f"architecture-dashboardapi/applications/{app_id}/metrics")
+    print(f"[DEBUG] Fetching architecture metrics from: {url}")
+
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -43,7 +47,7 @@ def get_architecture_metrics(app_id, lifetime_host, token):
     response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
-        print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code}")
+        print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code} from {url}")
         sys.exit(1)
 
     return response.json()
@@ -68,8 +72,7 @@ def main():
 
     metrics = get_architecture_metrics(app_id, args.lifetime_host, args.token)
 
-    # This structure depends on API response
-    # Adjust field names based on actual API
+    # Adjust these keys if API returns different field names
     result = {
         "application_id": app_id,
         "application_name": app_name,

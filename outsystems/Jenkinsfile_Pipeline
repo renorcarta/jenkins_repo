@@ -15,7 +15,7 @@ pipeline {
 
     environment {
         ArtifactsFolder = "Artifacts"
-        LifeTimeHostname = 'https://cmiti-lt.outsystemsenterprise.com/'
+        LifeTimeHostname = 'https://cmiti-lt.outsystemsenterprise.com'
         LifeTimeAPIVersion = 2
         AuthorizationToken = credentials('LifeTimeServiceAccountToken')
         DevelopmentEnvironment = 'https://cmiti-dev.outsystemsenterprise.com/'

@@ -63,7 +63,7 @@ pipeline {
                         . venv/bin/activate
 
                         echo "[INFO] Running PDF technical debt extraction..."
-                        python3 ../PDF/get_pdf_tech_debt.py \
+                        python3 MyRepo/PDF/get_pdf_tech_debt.py \
                             --pdf_path "${ArtifactsFolder}/architecture-report.pdf" \
                             --output "${ArtifactsFolder}/arch-debt.json"
                     '''

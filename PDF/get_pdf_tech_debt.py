@@ -33,20 +33,22 @@ def extract_technical_debt(pdf_path):
 
     return result
 
+import argparse
+
 def main():
-    pdf_path = "../PDF/CAS_CMIT_CLFC_SourceCodeReview.pdf"
-    output_path = "Artifacts/pdf-tech-debt.json"
+    parser = argparse.ArgumentParser(description="Extract technical debt from PDF")
+    parser.add_argument('--pdf_path', required=True, help='Path to PDF file')
+    parser.add_argument('--output', required=True, help='Output JSON file path')
+    args = parser.parse_args()
 
-    result = extract_technical_debt(pdf_path)
+    result = extract_technical_debt(args.pdf_path)
 
-    # Ensure output folder exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, "w") as f:
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    with open(args.output, "w") as f:
         json.dump(result, f, indent=2)
 
     print(f"✅ PDF technical debt extracted: {result['total_technical_debt_percent']}%")
-    print(f"📄 Output written to: {output_path}")
+    print(f"📄 Output written to: {args.output}")
 
 if __name__ == "__main__":
     main()

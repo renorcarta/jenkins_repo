@@ -16,17 +16,24 @@ def parse_args():
     return parser.parse_args()
 
 def load_applications(artifacts_path):
-    apps_path = os.path.join(artifacts_path, "applications.cache")
+    apps_path = os.path.join(artifacts_path, "applications.cache")  # previously applications.json
     if not os.path.isfile(apps_path):
         print(f"❌ Applications file not found at {apps_path}")
         sys.exit(1)
+
     with open(apps_path, "r") as f:
-        apps = json.load(f)
+        try:
+            apps = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse applications.cache: {e}")
+            sys.exit(1)
+
     return apps
 
 def get_app_by_name(apps, target_name):
+    normalized_target = target_name.replace("-", "").lower()
     for app in apps:
-        if app.get("Name") == target_name:
+        if app.get("Name", "").replace("-", "").lower() == normalized_target:
             return app
     return None
 

@@ -57,18 +57,24 @@ pipeline {
         stage('Check Architectural Debt') {
             steps {
                 withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
-                    sh '''
-                        . venv/bin/activate
-                        python3 outsystems/pipeline/get_architectural_debt.py --app_name "$ApplicationScopeWithTests" --artifacts "$ArtifactsFolder" --lifetime_host "$LifeTimeHostname" --arch_dashboard_host "$ArchitectureDashboard" --token "$LT_TOKEN" --output "$ArtifactsFolder/arch-debt.json" \
-                            --app_name "${ApplicationScopeWithTests}" \
-                            --artifacts "${ArtifactsFolder}" \
-                            --lifetime_host "${LifeTimeHostname}" \
-                            --arch_dashboard_host "${ArchitectureDashboard}" \
-                            --token "${LT_TOKEN}" \
-                            --output "${ArtifactsFolder}/arch-debt.json"
+                    script {
+                        sh '''
+                            echo "[INFO] Activating virtual environment..."
+                            . venv/bin/activate
 
-                        python3 outsystems/pipeline/check_architecture_quality.py
-                    '''
+                            echo "[INFO] Running architectural debt extraction..."
+                            python3 outsystems/pipeline/get_architectural_debt.py \
+                                --app_name "${ApplicationScopeWithTests}" \
+                                --artifacts "${ArtifactsFolder}" \
+                                --lifetime_host "${LifeTimeHostname}" \
+                                --arch_dashboard_host "${ArchitectureDashboard}" \
+                                --token "${LT_TOKEN}" \
+                                --output "${ArtifactsFolder}/arch-debt.json"
+
+                            echo "[INFO] Evaluating architectural debt quality..."
+                            python3 outsystems/pipeline/check_architecture_quality.py
+                        '''
+                    }
                 }
             }
             post {

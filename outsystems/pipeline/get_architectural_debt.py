@@ -3,32 +3,26 @@
 import argparse
 import json
 import sys
+import os
 import requests
-from urllib.parse import urljoin
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Get architectural debt from LifeTime/Architecture Dashboard")
     parser.add_argument("--app_name", required=True, help="Name of the OutSystems app")
+    parser.add_argument("--artifacts", required=True, help="Path to artifacts folder containing applications.json")
     parser.add_argument("--lifetime_host", required=True, help="Base URL of LifeTime (e.g. https://lt.example.com)")
     parser.add_argument("--token", required=True, help="Personal Access Token or Service Account token")
     parser.add_argument("--output", required=True, help="Output file path for the results (e.g. ./arch-debt.json)")
     return parser.parse_args()
 
-def fetch_app_list(lifetime_host, token):
-    url = urljoin(lifetime_host.rstrip('/') + '/', "lifetimeapi/v2/applications")
-    print(f"[DEBUG] Fetching applications list from: {url}")
-
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    response = requests.get(url, headers=headers)
-
-    if response.status_code != 200:
-        print(f"❌ Failed to fetch application list. HTTP {response.status_code} from {url}")
+def load_applications(artifacts_path):
+    apps_path = os.path.join(artifacts_path, "applications.json")
+    if not os.path.isfile(apps_path):
+        print(f"❌ Applications file not found at {apps_path}")
         sys.exit(1)
-
-    return response.json()
+    with open(apps_path, "r") as f:
+        apps = json.load(f)
+    return apps
 
 def get_app_by_name(apps, target_name):
     for app in apps:
@@ -37,42 +31,35 @@ def get_app_by_name(apps, target_name):
     return None
 
 def get_architecture_metrics(app_id, lifetime_host, token):
-    url = urljoin(lifetime_host.rstrip('/') + '/', f"architecture-dashboardapi/applications/{app_id}/metrics")
-    print(f"[DEBUG] Fetching architecture metrics from: {url}")
-
+    url = f"{lifetime_host}/architecture-dashboardapi/applications/{app_id}/metrics"
     headers = {
         "Authorization": f"Bearer {token}"
     }
-
     response = requests.get(url, headers=headers)
-
     if response.status_code != 200:
-        print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code} from {url}")
+        print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code}")
         sys.exit(1)
-
     return response.json()
 
 def main():
     args = parse_args()
 
-    print(f"🔍 Fetching application '{args.app_name}' from {args.lifetime_host}...")
+    print(f"🔍 Loading applications list from artifacts folder '{args.artifacts}'...")
+    apps = load_applications(args.artifacts)
 
-    apps = fetch_app_list(args.lifetime_host, args.token)
+    print(f"🔍 Searching for application '{args.app_name}'...")
     app = get_app_by_name(apps, args.app_name)
-
     if not app:
-        print(f"❌ Application '{args.app_name}' not found in LifeTime.")
+        print(f"❌ Application '{args.app_name}' not found in applications.json")
         sys.exit(1)
 
     app_id = app.get("Key")
     app_name = app.get("Name")
+    print(f"📦 Found application: {app_name} (ID: {app_id})")
 
-    print(f"📦 App found: {app_name} (ID: {app_id})")
-    print("📊 Fetching architecture metrics...")
-
+    print(f"📊 Fetching architecture metrics for app ID {app_id}...")
     metrics = get_architecture_metrics(app_id, args.lifetime_host, args.token)
 
-    # Adjust these keys if API returns different field names
     result = {
         "application_id": app_id,
         "application_name": app_name,

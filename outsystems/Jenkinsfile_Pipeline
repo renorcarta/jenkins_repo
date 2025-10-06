@@ -3,10 +3,8 @@ pipeline {
 
     parameters {
         string(name: 'ApplicationScope', defaultValue: 'https://cmiti-dev.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
-        string(name: 'ApplicationScopeWithTests', defaultValue: 'LOMSWEB', description: 'Comma-separated list of LifeTime applications to deploy (including test applications)')
+        string(name: 'ApplicationScopeWithTests', defaultValue: 'LOMSWEB', description: 'Comma-separated list of LifeTime applications (including tests).')
         string(name: 'TriggeredBy', defaultValue: 'Reynor Carta', description: 'Name of LifeTime user that triggered the pipeline remotely.')
-        string(name: 'MinArchitectureRating', defaultValue: 'B', description: 'Minimum allowed architecture rating (e.g., A, B)')
-        string(name: 'MaxViolations', defaultValue: '10', description: 'Maximum allowed number of architecture violations')
     }
 
     options {
@@ -16,98 +14,70 @@ pipeline {
     environment {
         ArtifactsFolder = "Artifacts"
         LifeTimeHostname = 'https://cmiti-lt.outsystemsenterprise.com'
-        LifeTimeAPIVersion = 2
+        LifeTimeAPIVersion = '2'
         AuthorizationToken = credentials('LifeTimeServiceAccountToken')
-        DevelopmentEnvironment = 'https://cmiti-dev.outsystemsenterprise.com/'
         OSPackageVersion = '0.10.1'
     }
 
     stages {
-
-        stage ('Install Python Dependencies') {
+        stage('Prepare Environment') {
             steps {
-                sh script: "mkdir -p ${env.ArtifactsFolder}", label: 'Create artifacts folder'
-
+                sh "mkdir -p ${env.ArtifactsFolder}"
                 sh '''
                     set -e
-                    echo "[INFO] Installing Python venv and required packages..."
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip
-                    pip install requests
-                    pip install outsystems-pipeline==${OSPackageVersion}
-                    echo "[INFO] Python environment and packages are ready."
+                    pip install outsystems-pipeline==${OSPackageVersion} requests
                 '''
             }
         }
 
-        stage('Debug: List Script') {
-          steps {
-            sh 'ls -l outsystems/pipeline/get_architectural_debt.py || echo "Script not found!"'
-          }
-        }
-
-       stage('Check Architectural Debt') {
-         steps {
-           sh '''
-             set -e
-             . venv/bin/activate
-
-             python3 outsystems/pipeline/get_architectural_debt.py \
-               --app_name "${ApplicationScopeWithTests}" \
-               --lifetime_host "${LifeTimeHostname}" \
-               --token "${AuthorizationToken}" \
-               --output "${ArtifactsFolder}/arch-debt.json"
-           '''
-         }
-       }
-
-
-        stage('Debug Env Vars') {
-          steps {
-            sh '''
-              echo "ApplicationScopeWithTests = ${ApplicationScopeWithTests}"
-              echo "LifeTimeHostname = ${LifeTimeHostname}"
-              # Don't print AuthorizationToken for security reasons
-            '''
-          }
-        }
-
-        stage('Check Artifact Exists') {
-          steps {
-            script {
-              if (!fileExists("${ArtifactsFolder}/arch-debt.json")) {
-                error("Architectural debt report not found. Aborting.")
-              }
+        stage('Fetch LifeTime Data') {
+            steps {
+                withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
+                    sh '''
+                        . venv/bin/activate
+                        python3 -m outsystems.pipeline.fetch_lifetime_data \
+                            --artifacts "${ArtifactsFolder}" \
+                            --lt_url "${LifeTimeHostname}" \
+                            --lt_token "${LT_TOKEN}" \
+                            --lt_api_version "${LifeTimeAPIVersion}"
+                    '''
+                }
             }
-          }
+        }
+
+        stage('Check Architectural Debt') {
+            steps {
+                withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
+                    script {
+                        // Passing ApplicationScopeWithTests as app_name
+                        sh '''
+                            . venv/bin/activate
+                            python3 outsystems/pipeline/get_architectural_debt.py \
+                                --app_name "${ApplicationScopeWithTests}" \
+                                --artifacts "${ArtifactsFolder}" \
+                                --lifetime_host "${LifeTimeHostname}" \
+                                --token "${LT_TOKEN}" \
+                                --output "${ArtifactsFolder}/arch-debt.json"
+                        '''
+                    }
+                }
+            }
         }
     }
 
     post {
         always {
             dir("${env.ArtifactsFolder}") {
-                sh 'echo "[DEBUG] Listing contents of ArtifactsFolder:" && ls -la || true'
-                archiveArtifacts artifacts: '**/*.cache', allowEmptyArchive: true
+                sh 'echo "Listing Artifacts folder contents:" && ls -la || true'
+                archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
             }
         }
-
-        failure {
-            dir("${env.ArtifactsFolder}") {
-                archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
-            }
-        }
-
         cleanup {
-            script {
-                if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                    dir("${env.ArtifactsFolder}") {
-                        echo "[CLEANUP] Deleting artifacts folder after successful run."
-                        deleteDir()
-                    }
-                } else {
-                    echo "[CLEANUP] Skipped deletion due to build failure for debugging purposes."
-                }
+            dir("${env.ArtifactsFolder}") {
+                deleteDir()
             }
         }
     }

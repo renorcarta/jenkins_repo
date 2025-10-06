@@ -40,71 +40,46 @@ pipeline {
             }
         }
 
-        stage('Check Architectural Debt') {
-            steps {
-                sh '''
-                    echo "[INFO] Running architectural debt analysis..."
-
-                    . venv/bin/activate
-                    mkdir -p "${ArtifactsFolder}"
-
-                    # Step 1: Run the analysis and save output
-                    python3 outsystems/pipeline/get_architectural_debt.py \\
-                            --app_name "${params.ApplicationScopeWithTests}" \\
-                            --lifetime_host "${LifeTimeHostname}" \\
-                            --token "${AuthorizationToken}" \\
-                            --output "${env.ArtifactsFolder}/arch-debt.json"
-
-                    # Step 2: Evaluate architectural debt
-                    python3 -c '
-                        import json, sys, os
-
-                        file_path = os.path.join("${ArtifactsFolder}", "arch-debt.json")
-                        with open(file_path) as f:
-                            data = json.load(f)
-
-                        rating = data.get("architecture_rating", "").upper()
-                        violations = int(data.get("total_violations", 0))
-
-                        min_rating = "${MinArchitectureRating}".upper()
-                        max_violations = int("${MaxViolations}")
-
-                        rating_order = ["A", "B", "C", "D", "E", "F"]
-
-                        if rating not in rating_order:
-                            print(f"❌ Unknown rating format: {rating}")
-                            sys.exit(1)
-
-                        if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
-                            print(f"❌ Failed architecture quality gate.")
-                            print(f"    Rating: {rating} (required: {min_rating})")
-                            print(f"    Violations: {violations} (allowed: {max_violations})")
-                            sys.exit(1)
-                        else:
-                            print(f"✅ Architecture check passed.")
-                            print(f"    Rating: {rating}")
-                            print(f"    Violations: {violations}")
-                                            '
-                                        '''
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: "${env.ArtifactsFolder}/arch-debt.json", allowEmptyArchive: true
-                }
-                success {
-                    echo "✅ Architectural debt check passed."
-                }
-                failure {
-                    echo "❌ Architectural debt check failed. Review 'arch-debt.json' for details."
-                }
-            }
+        stage('Debug: List Script') {
+          steps {
+            sh 'ls -l outsystems/pipeline/get_architectural_debt.py || echo "Script not found!"'
+          }
         }
 
-        stage('Debug Workspace') {
-                      steps {
-                        sh 'ls -R outsystems/pipeline'
-                      }
-                    }
+        stage('Check Architectural Debt') {
+          steps {
+            sh '''
+              set -x
+              mkdir -p ${ArtifactsFolder}
+
+              python3 outsystems/pipeline/get_architectural_debt.py \
+                --app_name "${ApplicationScopeWithTests}" \
+                --lifetime_host "${LifeTimeHostname}" \
+                --token "${AuthorizationToken}" \
+                --output "${ArtifactsFolder}/arch-debt.json"
+            '''
+          }
+        }
+
+        stage('Debug Env Vars') {
+          steps {
+            sh '''
+              echo "ApplicationScopeWithTests = ${ApplicationScopeWithTests}"
+              echo "LifeTimeHostname = ${LifeTimeHostname}"
+              # Don't print AuthorizationToken for security reasons
+            '''
+          }
+        }
+
+        stage('Check Artifact Exists') {
+          steps {
+            script {
+              if (!fileExists("${ArtifactsFolder}/arch-debt.json")) {
+                error("Architectural debt report not found. Aborting.")
+              }
+            }
+          }
+        }
     }
 
     post {

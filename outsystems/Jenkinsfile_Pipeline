@@ -29,6 +29,7 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip
+                    pip install requests beautifulsoup4
                     pip install outsystems-pipeline==${OSPackageVersion} requests
                 '''
             }

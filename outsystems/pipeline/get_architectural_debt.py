@@ -89,7 +89,7 @@ def main():
     print(f"📦 Found application: {app_name} (ID: {app_id})")
 
     print(f"📊 Fetching architecture metrics for app ID {app_id}...")
-    metrics = get_architecture_metrics(app_id, args.arch_dashboard_host, args.token)
+    metrics = get_architecture_metrics_from_report(app_id, args.arch_dashboard_host, args.token)
 
     result = {
         "application_id": app_id,

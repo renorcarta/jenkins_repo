@@ -18,6 +18,9 @@ pipeline {
         LifeTimeAPIVersion = '2'
         AuthorizationToken = credentials('LifeTimeServiceAccountToken')
         OSPackageVersion = '0.10.1'
+
+        MinArchitectureRating = "B"
+        MaxViolations = "10"
     }
 
     stages {

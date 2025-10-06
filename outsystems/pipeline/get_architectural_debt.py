@@ -46,51 +46,61 @@ def get_architecture_metrics_from_overview(app_name, arch_dashboard_host, token)
         "User-Agent": "Mozilla/5.0"
     }
 
-    print(f"[DEBUG] Requesting Architecture Overview page: {url}")
-
+    print(f"[DEBUG] Requesting Overview page: {url}")
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
-        print(f"❌ Failed to fetch architecture overview page. HTTP {response.status_code}")
+        print(f"❌ Failed to fetch overview page. HTTP {response.status_code}")
         print(f"➡️ Response content:\n{response.text}")
         sys.exit(1)
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    # Find the app card or row by matching app_name (case-insensitive, normalized)
-    # Adjust the selector below depending on HTML structure for apps on the overview page
-    app_cards = soup.find_all(class_="card")  # Or a better selector matching app cards
+    # Step 1: read the selected app(s) from the multiselect label
+    selected_label = soup.select_one(".multiselect-label.has-selected-opts")
+    selected_text = None
+    if selected_label:
+        selected_text = selected_label.get_text(strip=True)
+        print(f"[DEBUG] Found selected application label: '{selected_text}'")
+    else:
+        print("[WARN] Could not find multiselect-label.has-selected-opts element for app name.")
+        selected_text = app_name  # fallback to the passed app_name
 
+    # Normalize names for matching
+    norm_selected = selected_text.replace("-", "").lower() if selected_text else app_name.replace("-", "").lower()
+
+    # Now find the “card” or UI block for that application
+    # This depends on how the Overview page structures each application card
+    # e.g. maybe each card has class "card" or "app-card"
+    app_cards = soup.find_all("div", class_="card")
     target_card = None
-    normalized_target = app_name.replace("-", "").lower()
 
     for card in app_cards:
-        # You need to identify where the app name appears in the card
-        # For example, maybe inside an element with class "card-header" or similar
-        card_title_elem = card.find(class_="card-header")  # Adjust as needed
-        if card_title_elem and card_title_elem.text.strip().replace("-", "").lower() == normalized_target:
-            target_card = card
-            break
+        # Try to find a title or label inside the card for the application
+        title_elem = card.find(class_="card-title") or card.find("h3")  # or whatever the structure is
+        if title_elem:
+            title_text = title_elem.get_text(strip=True).replace("-", "").lower()
+            if title_text == norm_selected:
+                target_card = card
+                break
 
     if not target_card:
-        print(f"❌ Application '{app_name}' not found on overview page.")
+        print(f"❌ Could not find card for application matching '{norm_selected}' in overview.")
         sys.exit(1)
 
-    # Now scrape fields inside target_card:
-
-    # Example: Architecture Rating, maybe a span or div with a known class/id inside the card
-    rating_elem = target_card.find(class_="architecture-rating")  # Replace with actual class
-
-    architecture_rating = rating_elem.text.strip() if rating_elem else "N/A"
+    # Now scrape fields inside that target_card
+    # Rating
+    rating_elem = target_card.select_one(".architecture-rating")  # adjust class
+    architecture_rating = rating_elem.get_text(strip=True) if rating_elem else "N/A"
 
     # Violations
-    violations_elem = target_card.find(class_="total-violations")  # Replace with actual class
-    total_violations = int(violations_elem.text.strip()) if violations_elem else 0
+    violations_elem = target_card.select_one(".total-violations")
+    total_violations = int(violations_elem.get_text(strip=True)) if violations_elem else 0
 
-    # Technical Debt %
+    # Technical debt %
     tech_debt_elem = target_card.find("div", class_="ph card card-content padding-base shadow-level-0 white-space-nowrap")
     technical_debt_percent = tech_debt_elem.get_text(strip=True) if tech_debt_elem else "N/A"
 
-    # Scores container
+    # Scores
     scores = []
     scores_container = target_card.select_one("div.columns.columns3.gutter-base.tablet-break-none.phone-break-none.margin-y-base")
     if scores_container:
@@ -103,7 +113,8 @@ def get_architecture_metrics_from_overview(app_name, arch_dashboard_host, token)
         "ArchitectureRating": architecture_rating,
         "TotalViolations": total_violations,
         "TechnicalDebtPercent": technical_debt_percent,
-        "Scores": scores
+        "Scores": scores,
+        "SelectedApplicationName": selected_text
     }
 
 def main():
@@ -124,7 +135,9 @@ def main():
 
     print(f"📊 Fetching architecture metrics for app ID {app_id}...")
 
-    metrics = get_architecture_metrics_from_overview(args.app_name, args.arch_dashboard_host, args.token)
+    metrics = get_architecture_metrics_from_overview(
+        args.app_name, args.arch_dashboard_host, args.token
+    )
 
     result = {
         "application_id": app_id,

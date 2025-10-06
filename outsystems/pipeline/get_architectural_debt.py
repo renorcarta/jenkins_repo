@@ -39,60 +39,70 @@ def get_app_by_name(apps, target_name):
             return app
     return None
 
-def get_architecture_metrics_from_report(app_id, arch_dashboard_host, token):
-    # Construct the URL with ApplicationId param
-    url = f"{arch_dashboard_host}/MentorStudio/Report?ApplicationId={app_id}&ModuleId=0&TeamId=0"
+def get_architecture_metrics_from_overview(app_name, arch_dashboard_host, token):
+    url = f"{arch_dashboard_host}/MentorStudio/Overview?TeamId=0"
     headers = {
         "Authorization": f"Bearer {token}",
         "User-Agent": "Mozilla/5.0"
     }
 
-    print(f"[DEBUG] Requesting Architecture Report page: {url}")
+    print(f"[DEBUG] Requesting Architecture Overview page: {url}")
 
     response = requests.get(url, headers=headers)
-
     if response.status_code != 200:
-        print(f"❌ Failed to fetch architecture report page. HTTP {response.status_code}")
+        print(f"❌ Failed to fetch architecture overview page. HTTP {response.status_code}")
         print(f"➡️ Response content:\n{response.text}")
         sys.exit(1)
 
-    # Parse HTML
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Old placeholders - adjust if needed
-    rating_element = soup.find(id="architectureRating")  # Replace with actual selector if available
-    violations_element = soup.find(id="totalViolations")  # Replace with actual selector if available
+    # Find the app card or row by matching app_name (case-insensitive, normalized)
+    # Adjust the selector below depending on HTML structure for apps on the overview page
+    app_cards = soup.find_all(class_="card")  # Or a better selector matching app cards
 
-    architecture_rating = rating_element.text.strip() if rating_element else "N/A"
-    total_violations = int(violations_element.text.strip()) if violations_element else 0
+    target_card = None
+    normalized_target = app_name.replace("-", "").lower()
 
-    # --- New scraping ---
+    for card in app_cards:
+        # You need to identify where the app name appears in the card
+        # For example, maybe inside an element with class "card-header" or similar
+        card_title_elem = card.find(class_="card-header")  # Adjust as needed
+        if card_title_elem and card_title_elem.text.strip().replace("-", "").lower() == normalized_target:
+            target_card = card
+            break
 
-    # Technical Debt %: element with classes "ph card card-content padding-base shadow-level-0 white-space-nowrap"
-    tech_debt_element = soup.find("div", class_="ph card card-content padding-base shadow-level-0 white-space-nowrap")
-    technical_debt_percent = None
-    if tech_debt_element:
-        # Sometimes the percentage may be inside a span or direct text
-        technical_debt_percent = tech_debt_element.get_text(strip=True)
-    else:
-        print("[WARN] Technical Debt % element not found.")
+    if not target_card:
+        print(f"❌ Application '{app_name}' not found on overview page.")
+        sys.exit(1)
 
-    # Scores container: div with classes "columns columns3 gutter-base tablet-break-none phone-break-none margin-y-base"
+    # Now scrape fields inside target_card:
+
+    # Example: Architecture Rating, maybe a span or div with a known class/id inside the card
+    rating_elem = target_card.find(class_="architecture-rating")  # Replace with actual class
+
+    architecture_rating = rating_elem.text.strip() if rating_elem else "N/A"
+
+    # Violations
+    violations_elem = target_card.find(class_="total-violations")  # Replace with actual class
+    total_violations = int(violations_elem.text.strip()) if violations_elem else 0
+
+    # Technical Debt %
+    tech_debt_elem = target_card.find("div", class_="ph card card-content padding-base shadow-level-0 white-space-nowrap")
+    technical_debt_percent = tech_debt_elem.get_text(strip=True) if tech_debt_elem else "N/A"
+
+    # Scores container
     scores = []
-    scores_container = soup.select_one("div.columns.columns3.gutter-base.tablet-break-none.phone-break-none.margin-y-base")
+    scores_container = target_card.select_one("div.columns.columns3.gutter-base.tablet-break-none.phone-break-none.margin-y-base")
     if scores_container:
-        # Extract all direct children texts (or you can be more specific)
         for child in scores_container.find_all(recursive=False):
             text = child.get_text(strip=True)
             if text:
                 scores.append(text)
-    else:
-        print("[WARN] Scores container element not found.")
 
     return {
         "ArchitectureRating": architecture_rating,
         "TotalViolations": total_violations,
-        "TechnicalDebtPercent": technical_debt_percent if technical_debt_percent else "N/A",
+        "TechnicalDebtPercent": technical_debt_percent,
         "Scores": scores
     }
 
@@ -113,7 +123,8 @@ def main():
     print(f"📦 Found application: {app_name} (ID: {app_id})")
 
     print(f"📊 Fetching architecture metrics for app ID {app_id}...")
-    metrics = get_architecture_metrics_from_report(app_id, args.arch_dashboard_host, args.token)
+
+    metrics = get_architecture_metrics_from_overview(args.app_name, args.arch_dashboard_host, args.token)
 
     result = {
         "application_id": app_id,

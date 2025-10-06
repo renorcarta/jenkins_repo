@@ -59,7 +59,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
                     sh '''
                         . venv/bin/activate
-                        python3 outsystems/pipeline/get_architectural_debt.py \
+                        python3 outsystems/pipeline/get_architectural_debt.py --app_name "$ApplicationScopeWithTests" --artifacts "$ArtifactsFolder" --lifetime_host "$LifeTimeHostname" --arch_dashboard_host "$ArchitectureDashboard" --token "$LT_TOKEN" --output "$ArtifactsFolder/arch-debt.json" \
                             --app_name "${ApplicationScopeWithTests}" \
                             --artifacts "${ArtifactsFolder}" \
                             --lifetime_host "${LifeTimeHostname}" \

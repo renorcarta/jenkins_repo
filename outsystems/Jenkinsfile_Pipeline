@@ -101,32 +101,4 @@ else:
             }
         }
     }
-
-    post {
-        always {
-            dir("${env.ArtifactsFolder}") {
-                sh 'echo "[DEBUG] Listing contents of ArtifactsFolder:" && ls -la || true'
-                archiveArtifacts artifacts: '**/*.cache', allowEmptyArchive: true
-            }
-        }
-
-        failure {
-            dir("${env.ArtifactsFolder}") {
-                archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
-            }
-        }
-
-        cleanup {
-            script {
-                if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
-                    dir("${env.ArtifactsFolder}") {
-                        echo "[CLEANUP] Deleting artifacts folder after successful run."
-                        deleteDir()
-                    }
-                } else {
-                    echo "[CLEANUP] Skipped deletion due to build failure for debugging purposes."
-                }
-            }
-        }
-    }
 }

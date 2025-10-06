@@ -59,17 +59,41 @@ def get_architecture_metrics_from_report(app_id, arch_dashboard_host, token):
     # Parse HTML
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # You need to inspect the HTML to find where the rating and violations are shown
-    # Example placeholders:
-    rating_element = soup.find(id="architectureRating")  # Replace with actual selector
-    violations_element = soup.find(id="totalViolations")  # Replace with actual selector
+    # Old placeholders - adjust if needed
+    rating_element = soup.find(id="architectureRating")  # Replace with actual selector if available
+    violations_element = soup.find(id="totalViolations")  # Replace with actual selector if available
 
     architecture_rating = rating_element.text.strip() if rating_element else "N/A"
     total_violations = int(violations_element.text.strip()) if violations_element else 0
 
+    # --- New scraping ---
+
+    # Technical Debt %: element with classes "ph card card-content padding-base shadow-level-0 white-space-nowrap"
+    tech_debt_element = soup.find("div", class_="ph card card-content padding-base shadow-level-0 white-space-nowrap")
+    technical_debt_percent = None
+    if tech_debt_element:
+        # Sometimes the percentage may be inside a span or direct text
+        technical_debt_percent = tech_debt_element.get_text(strip=True)
+    else:
+        print("[WARN] Technical Debt % element not found.")
+
+    # Scores container: div with classes "columns columns3 gutter-base tablet-break-none phone-break-none margin-y-base"
+    scores = []
+    scores_container = soup.select_one("div.columns.columns3.gutter-base.tablet-break-none.phone-break-none.margin-y-base")
+    if scores_container:
+        # Extract all direct children texts (or you can be more specific)
+        for child in scores_container.find_all(recursive=False):
+            text = child.get_text(strip=True)
+            if text:
+                scores.append(text)
+    else:
+        print("[WARN] Scores container element not found.")
+
     return {
         "ArchitectureRating": architecture_rating,
-        "TotalViolations": total_violations
+        "TotalViolations": total_violations,
+        "TechnicalDebtPercent": technical_debt_percent if technical_debt_percent else "N/A",
+        "Scores": scores
     }
 
 def main():
@@ -95,7 +119,9 @@ def main():
         "application_id": app_id,
         "application_name": app_name,
         "architecture_rating": metrics.get("ArchitectureRating", "N/A"),
-        "total_violations": metrics.get("TotalViolations", 0)
+        "total_violations": metrics.get("TotalViolations", 0),
+        "technical_debt_percent": metrics.get("TechnicalDebtPercent", "N/A"),
+        "scores": metrics.get("Scores", [])
     }
 
     # Ensure output directory exists before writing
@@ -109,6 +135,8 @@ def main():
     print(f"✅ Architectural debt data saved to {args.output}")
     print(f"   Rating: {result['architecture_rating']}")
     print(f"   Violations: {result['total_violations']}")
+    print(f"   Technical Debt %: {result['technical_debt_percent']}")
+    print(f"   Scores: {result['scores']}")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,132 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'ApplicationScope', defaultValue: 'https://cmiti-dev.outsystemsenterprise.com/', description: 'Comma-separated list of LifeTime applications to deploy.')
+        string(name: 'ApplicationScopeWithTests', defaultValue: 'LOMSWEB', description: 'Comma-separated list of LifeTime applications to deploy (including test applications)')
+        string(name: 'TriggeredBy', defaultValue: 'Reynor Carta', description: 'Name of LifeTime user that triggered the pipeline remotely.')
+        string(name: 'MinArchitectureRating', defaultValue: 'B', description: 'Minimum allowed architecture rating (e.g., A, B)')
+        string(name: 'MaxViolations', defaultValue: '10', description: 'Maximum allowed number of architecture violations')
+    }
+
+    options {
+        skipStagesAfterUnstable()
+    }
+
+    environment {
+        ArtifactsFolder = "Artifacts"
+        LifeTimeHostname = 'https://cmiti-lt.outsystemsenterprise.com/'
+        LifeTimeAPIVersion = 2
+        AuthorizationToken = credentials('LifeTimeServiceAccountToken')
+        DevelopmentEnvironment = 'https://cmiti-dev.outsystemsenterprise.com/'
+        OSPackageVersion = '0.10.1'
+    }
+
+    stages {
+
+        stage ('Install Python Dependencies') {
+            steps {
+                sh script: "mkdir -p ${env.ArtifactsFolder}", label: 'Create artifacts folder'
+
+                sh '''
+                    set -e
+                    echo "[INFO] Installing Python venv and required packages..."
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install outsystems-pipeline==${OSPackageVersion}
+                    echo "[INFO] Python environment and packages are ready."
+                '''
+            }
+        }
+
+        stage('Check Architectural Debt') {
+            steps {
+                sh '''
+                    echo "[INFO] Running architectural debt analysis..."
+
+                    . venv/bin/activate
+                    mkdir -p "${ArtifactsFolder}"
+
+                    # Step 1: Run the analysis and save output
+                    python3 -m outsystems.pipeline.get_architectural_debt \\
+                        --app_name "${ApplicationScopeWithTests}" \\
+                        --lifetime_host "${LifeTimeHostname}" \\
+                        --token "${AuthorizationToken}" \\
+                        --output "${ArtifactsFolder}/arch-debt.json"
+
+                    # Step 2: Evaluate architectural debt
+                    python3 -c '
+import json, sys, os
+
+file_path = os.path.join("${ArtifactsFolder}", "arch-debt.json")
+with open(file_path) as f:
+    data = json.load(f)
+
+rating = data.get("architecture_rating", "").upper()
+violations = int(data.get("total_violations", 0))
+
+min_rating = "${MinArchitectureRating}".upper()
+max_violations = int("${MaxViolations}")
+
+rating_order = ["A", "B", "C", "D", "E", "F"]
+
+if rating not in rating_order:
+    print(f"❌ Unknown rating format: {rating}")
+    sys.exit(1)
+
+if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
+    print(f"❌ Failed architecture quality gate.")
+    print(f"    Rating: {rating} (required: {min_rating})")
+    print(f"    Violations: {violations} (allowed: {max_violations})")
+    sys.exit(1)
+else:
+    print(f"✅ Architecture check passed.")
+    print(f"    Rating: {rating}")
+    print(f"    Violations: {violations}")
+                    '
+                '''
+            }
+
+            post {
+                always {
+                    archiveArtifacts artifacts: "${env.ArtifactsFolder}/arch-debt.json", allowEmptyArchive: true
+                }
+                success {
+                    echo "✅ Architectural debt check passed."
+                }
+                failure {
+                    echo "❌ Architectural debt check failed. Review 'arch-debt.json' for details."
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir("${env.ArtifactsFolder}") {
+                sh 'echo "[DEBUG] Listing contents of ArtifactsFolder:" && ls -la || true'
+                archiveArtifacts artifacts: '**/*.cache', allowEmptyArchive: true
+            }
+        }
+
+        failure {
+            dir("${env.ArtifactsFolder}") {
+                archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
+            }
+        }
+
+        cleanup {
+            script {
+                if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
+                    dir("${env.ArtifactsFolder}") {
+                        echo "[CLEANUP] Deleting artifacts folder after successful run."
+                        deleteDir()
+                    }
+                } else {
+                    echo "[CLEANUP] Skipped deletion due to build failure for debugging purposes."
+                }
+            }
+        }
+    }
+}

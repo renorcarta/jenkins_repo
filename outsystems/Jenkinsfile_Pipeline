@@ -57,24 +57,18 @@ pipeline {
         stage('Check Architectural Debt') {
             steps {
                 withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
-                    script {
-                        sh '''
-                            # Activate virtual environment if needed
-                            . venv/bin/activate
+                    sh '''
+                        . venv/bin/activate
+                        python3 outsystems/pipeline/get_architectural_debt.py \
+                            --app_name "${ApplicationScopeWithTests}" \
+                            --artifacts "${ArtifactsFolder}" \
+                            --lifetime_host "${LifeTimeHostname}" \
+                            --arch_dashboard_host "${ArchitectureDashboard}" \
+                            --token "${LT_TOKEN}" \
+                            --output "${ArtifactsFolder}/arch-debt.json"
 
-                            # Run the architectural debt analysis script
-                            python3 outsystems/pipeline/get_architectural_debt.py \
-                                --app_name "${ApplicationScopeWithTests}" \
-                                --artifacts "${ArtifactsFolder}" \
-                                --lifetime_host "${LifeTimeHostname}" \
-                                --arch_dashboard_host "${ArchitectureDashboard}" \
-                                --token "${LT_TOKEN}" \
-                                --output "${ArtifactsFolder}/arch-debt.json"
-
-                            # Now run the quality gate checker
-                            python3 check_architecture_quality.py
-                        '''
-                    }
+                        python3 outsystems/pipeline/check_architecture_quality.py
+                    '''
                 }
             }
             post {

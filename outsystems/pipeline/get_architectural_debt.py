@@ -73,37 +73,42 @@ def get_architecture_metrics_from_report(app_id, arch_dashboard_host, token):
     }
 
 def main():
-    artifacts_folder = os.environ.get('ArtifactsFolder')
-    min_rating = os.environ.get('MinArchitectureRating', '').upper()
-    max_violations_str = os.environ.get('MaxViolations', '')
-    try:
-        max_violations = int(max_violations_str)
-    except ValueError:
-        print(f"❌ Invalid MaxViolations value: '{max_violations_str}'")
+    args = parse_args()
+
+    print(f"🔍 Loading applications list from artifacts folder '{args.artifacts}'...")
+    apps = load_applications(args.artifacts)
+
+    print(f"🔍 Searching for application '{args.app_name}'...")
+    app = get_app_by_name(apps, args.app_name)
+    if not app:
+        print(f"❌ Application '{args.app_name}' not found in applications.cache")
         sys.exit(1)
 
-    file_path = os.path.join(artifacts_folder, "arch-debt.json")
-    with open(file_path) as f:
-        data = json.load(f)
+    app_id = app.get("Key")
+    app_name = app.get("Name")
+    print(f"📦 Found application: {app_name} (ID: {app_id})")
 
-    rating = data.get('architecture_rating', '').upper()
-    violations = int(data.get('total_violations', 0))
+    print(f"📊 Fetching architecture metrics for app ID {app_id}...")
+    metrics = get_architecture_metrics_from_report(app_id, args.arch_dashboard_host, args.token)
 
-    rating_order = ['A','B','C','D','E','F']
+    result = {
+        "application_id": app_id,
+        "application_name": app_name,
+        "architecture_rating": metrics.get("ArchitectureRating", "N/A"),
+        "total_violations": metrics.get("TotalViolations", 0)
+    }
 
-    if rating not in rating_order:
-        print(f'❌ Unknown rating format: {rating}')
-        sys.exit(1)
+    # Ensure output directory exists before writing
+    output_dir = os.path.dirname(args.output)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
-        print(f'❌ Failed architecture quality gate.')
-        print(f'    Rating: {rating} (required minimum: {min_rating})')
-        print(f'    Violations: {violations} (max allowed: {max_violations})')
-        sys.exit(1)
-    else:
-        print(f'✅ Architecture check passed.')
-        print(f'    Rating: {rating}')
-        print(f'    Violations: {violations}')
+    with open(args.output, "w") as f:
+        json.dump(result, f, indent=2)
+
+    print(f"✅ Architectural debt data saved to {args.output}")
+    print(f"   Rating: {result['architecture_rating']}")
+    print(f"   Violations: {result['total_violations']}")
 
 if __name__ == "__main__":
     main()

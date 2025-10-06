@@ -42,7 +42,6 @@ pipeline {
                         python3 -m outsystems.pipeline.fetch_lifetime_data \
                             --artifacts "${ArtifactsFolder}" \
                             --lt_url "${LifeTimeHostname}" \
-                            --arch_dashboard_host "${ArchitectureDashboard}" \
                             --lt_token "${LT_TOKEN}" \
                             --lt_api_version "${LifeTimeAPIVersion}"
                     '''
@@ -62,7 +61,7 @@ pipeline {
                                 --app_name "${ApplicationScopeWithTests}" \
                                 --artifacts "${ArtifactsFolder}" \
                                 --lifetime_host "${LifeTimeHostname}" \
-                                --arch_dashboard_host https://aimentorstudio.outsystems.com \
+                                --arch_dashboard_host "${ArchitectureDashboard}" \
                                 --token "${LT_TOKEN}" \
                                 --output "${ArtifactsFolder}/arch-debt.json"
                         '''

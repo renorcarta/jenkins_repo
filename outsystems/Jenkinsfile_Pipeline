@@ -54,27 +54,19 @@ pipeline {
             }
         }
 
-        stage('Check Architectural Debt') {
+        stage('Check Architectural Debt from PDF') {
             steps {
-                withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
-                    script {
-                        sh '''
-                            echo "[INFO] Activating virtual environment..."
-                            . venv/bin/activate
+                script {
+                    sh '''
+                        set -e
+                        echo "[INFO] Activating virtual environment..."
+                        . venv/bin/activate
 
-                            echo "[INFO] Running architectural debt extraction..."
-                            python3 outsystems/pipeline/get_architectural_debt.py \
-                                --app_name "${ApplicationScopeWithTests}" \
-                                --artifacts "${ArtifactsFolder}" \
-                                --lifetime_host "${LifeTimeHostname}" \
-                                --arch_dashboard_host "${ArchitectureDashboard}" \
-                                --token "${LT_TOKEN}" \
-                                --output "${ArtifactsFolder}/arch-debt.json"
-
-                            echo "[INFO] Evaluating architectural debt quality..."
-                            python3 outsystems/pipeline/check_architecture_quality.py
-                        '''
-                    }
+                        echo "[INFO] Running PDF technical debt extraction..."
+                        python3 ../PDF/get_pdf_tech_debt.py \
+                            --pdf_path "${ArtifactsFolder}/architecture-report.pdf" \
+                            --output "${ArtifactsFolder}/arch-debt.json"
+                    '''
                 }
             }
             post {
@@ -82,10 +74,10 @@ pipeline {
                     archiveArtifacts artifacts: "${ArtifactsFolder}/arch-debt.json", allowEmptyArchive: true
                 }
                 success {
-                    echo "✅ Architectural debt check passed."
+                    echo "✅ PDF technical debt extraction passed."
                 }
                 failure {
-                    echo "❌ Architectural debt check failed. Review 'arch-debt.json' for details."
+                    echo "❌ PDF technical debt extraction failed. Review 'arch-debt.json' for details."
                 }
             }
         }

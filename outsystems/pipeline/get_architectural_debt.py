@@ -5,6 +5,7 @@ import json
 import sys
 import os
 import requests
+from bs4 import BeautifulSoup
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Get architectural debt from LifeTime and Architecture Dashboard")
@@ -38,23 +39,38 @@ def get_app_by_name(apps, target_name):
             return app
     return None
 
-def get_architecture_metrics(app_id, arch_dashboard_host, token):
-    # Use the Architecture Dashboard host (separate from LifeTime)
-    url = f"{arch_dashboard_host}/api/applications/{app_id}/metrics"  # Adjust the path based on your Architecture Dashboard API
+def get_architecture_metrics_from_report(app_id, arch_dashboard_host, token):
+    # Construct the URL with ApplicationId param
+    url = f"{arch_dashboard_host}/MentorStudio/Report?ApplicationId={app_id}&ModuleId=0&TeamId=0"
     headers = {
-        "Authorization": f"Bearer {token}"
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "Mozilla/5.0"
     }
 
-    print(f"[DEBUG] Requesting Architecture Metrics from: {url}")
+    print(f"[DEBUG] Requesting Architecture Report page: {url}")
 
     response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
-        print(f"❌ Failed to fetch architecture metrics. HTTP {response.status_code}")
+        print(f"❌ Failed to fetch architecture report page. HTTP {response.status_code}")
         print(f"➡️ Response content:\n{response.text}")
         sys.exit(1)
 
-    return response.json()
+    # Parse HTML
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # You need to inspect the HTML to find where the rating and violations are shown
+    # Example placeholders:
+    rating_element = soup.find(id="architectureRating")  # Replace with actual selector
+    violations_element = soup.find(id="totalViolations")  # Replace with actual selector
+
+    architecture_rating = rating_element.text.strip() if rating_element else "N/A"
+    total_violations = int(violations_element.text.strip()) if violations_element else 0
+
+    return {
+        "ArchitectureRating": architecture_rating,
+        "TotalViolations": total_violations
+    }
 
 def main():
     args = parse_args()

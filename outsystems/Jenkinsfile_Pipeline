@@ -49,45 +49,44 @@ pipeline {
                     mkdir -p "${ArtifactsFolder}"
 
                     # Step 1: Run the analysis and save output
-                    python3 -m outsystems.pipeline.get_architectural_debt \\
-                        --app_name "${ApplicationScopeWithTests}" \\
-                        --lifetime_host "${LifeTimeHostname}" \\
-                        --token "${AuthorizationToken}" \\
-                        --output "${ArtifactsFolder}/arch-debt.json"
+                    python3 outsystems/pipeline/get_architectural_debt.py \\
+                            --app_name "${params.ApplicationScopeWithTests}" \\
+                            --lifetime_host "${LifeTimeHostname}" \\
+                            --token "${AuthorizationToken}" \\
+                            --output "${env.ArtifactsFolder}/arch-debt.json"
 
                     # Step 2: Evaluate architectural debt
                     python3 -c '
-import json, sys, os
+                        import json, sys, os
 
-file_path = os.path.join("${ArtifactsFolder}", "arch-debt.json")
-with open(file_path) as f:
-    data = json.load(f)
+                        file_path = os.path.join("${ArtifactsFolder}", "arch-debt.json")
+                        with open(file_path) as f:
+                            data = json.load(f)
 
-rating = data.get("architecture_rating", "").upper()
-violations = int(data.get("total_violations", 0))
+                        rating = data.get("architecture_rating", "").upper()
+                        violations = int(data.get("total_violations", 0))
 
-min_rating = "${MinArchitectureRating}".upper()
-max_violations = int("${MaxViolations}")
+                        min_rating = "${MinArchitectureRating}".upper()
+                        max_violations = int("${MaxViolations}")
 
-rating_order = ["A", "B", "C", "D", "E", "F"]
+                        rating_order = ["A", "B", "C", "D", "E", "F"]
 
-if rating not in rating_order:
-    print(f"❌ Unknown rating format: {rating}")
-    sys.exit(1)
+                        if rating not in rating_order:
+                            print(f"❌ Unknown rating format: {rating}")
+                            sys.exit(1)
 
-if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
-    print(f"❌ Failed architecture quality gate.")
-    print(f"    Rating: {rating} (required: {min_rating})")
-    print(f"    Violations: {violations} (allowed: {max_violations})")
-    sys.exit(1)
-else:
-    print(f"✅ Architecture check passed.")
-    print(f"    Rating: {rating}")
-    print(f"    Violations: {violations}")
-                    '
-                '''
+                        if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
+                            print(f"❌ Failed architecture quality gate.")
+                            print(f"    Rating: {rating} (required: {min_rating})")
+                            print(f"    Violations: {violations} (allowed: {max_violations})")
+                            sys.exit(1)
+                        else:
+                            print(f"✅ Architecture check passed.")
+                            print(f"    Rating: {rating}")
+                            print(f"    Violations: {violations}")
+                                            '
+                                        '''
             }
-
             post {
                 always {
                     archiveArtifacts artifacts: "${env.ArtifactsFolder}/arch-debt.json", allowEmptyArchive: true
@@ -97,6 +96,40 @@ else:
                 }
                 failure {
                     echo "❌ Architectural debt check failed. Review 'arch-debt.json' for details."
+                }
+            }
+        }
+
+        stage('Debug Workspace') {
+                      steps {
+                        sh 'ls -R outsystems/pipeline'
+                      }
+                    }
+    }
+
+    post {
+        always {
+            dir("${env.ArtifactsFolder}") {
+                sh 'echo "[DEBUG] Listing contents of ArtifactsFolder:" && ls -la || true'
+                archiveArtifacts artifacts: '**/*.cache', allowEmptyArchive: true
+            }
+        }
+
+        failure {
+            dir("${env.ArtifactsFolder}") {
+                archiveArtifacts artifacts: 'DeploymentConflicts', allowEmptyArchive: true
+            }
+        }
+
+        cleanup {
+            script {
+                if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {
+                    dir("${env.ArtifactsFolder}") {
+                        echo "[CLEANUP] Deleting artifacts folder after successful run."
+                        deleteDir()
+                    }
+                } else {
+                    echo "[CLEANUP] Skipped deletion due to build failure for debugging purposes."
                 }
             }
         }

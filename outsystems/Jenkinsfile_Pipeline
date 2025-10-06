@@ -56,45 +56,20 @@ pipeline {
                 withCredentials([string(credentialsId: 'LifeTimeServiceAccountToken', variable: 'LT_TOKEN')]) {
                     script {
                         sh '''
-                            echo "[INFO] Running architectural debt analysis..."
+                            # Activate virtual environment if needed
                             . venv/bin/activate
-                            mkdir -p "${ArtifactsFolder}"
 
-                            python3 outsystems/pipeline/get_architectural_debt.py \\
-                                --app_name "${ApplicationScopeWithTests}" \\
-                                --artifacts "${ArtifactsFolder}" \\
-                                --lifetime_host "${LifeTimeHostname}" \\
-                                --arch_dashboard_host "${ArchitectureDashboard}" \\
-                                --token "${LT_TOKEN}" \\
+                            # Run the architectural debt analysis script
+                            python3 outsystems/pipeline/get_architectural_debt.py \
+                                --app_name "${ApplicationScopeWithTests}" \
+                                --artifacts "${ArtifactsFolder}" \
+                                --lifetime_host "${LifeTimeHostname}" \
+                                --arch_dashboard_host "${ArchitectureDashboard}" \
+                                --token "${LT_TOKEN}" \
                                 --output "${ArtifactsFolder}/arch-debt.json"
 
-                            echo "[INFO] Evaluating architectural debt against thresholds..."
-
-                            python3 -c "
-        import json, sys, os
-        file_path = os.path.join('${ArtifactsFolder}', 'arch-debt.json')
-        with open(file_path) as f:
-            data = json.load(f)
-        rating = data.get('architecture_rating', '').upper()
-        violations = int(data.get('total_violations', 0))
-        min_rating = '${MinArchitectureRating}'.upper()
-        max_violations = int('${MaxViolations}')
-        rating_order = ['A','B','C','D','E','F']
-
-        if rating not in rating_order:
-            print(f'❌ Unknown rating format: {rating}')
-            sys.exit(1)
-
-        if rating_order.index(rating) > rating_order.index(min_rating) or violations > max_violations:
-            print(f'❌ Failed architecture quality gate.')
-            print(f'    Rating: {rating} (required minimum: {min_rating})')
-            print(f'    Violations: {violations} (max allowed: {max_violations})')
-            sys.exit(1)
-        else:
-            print(f'✅ Architecture check passed.')
-            print(f'    Rating: {rating}')
-            print(f'    Violations: {violations}')
-        "
+                            # Now run the quality gate checker
+                            python3 check_architecture_quality.py
                         '''
                     }
                 }

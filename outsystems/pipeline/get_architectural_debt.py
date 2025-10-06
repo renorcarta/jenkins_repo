@@ -16,7 +16,7 @@ def parse_args():
     return parser.parse_args()
 
 def load_applications(artifacts_path):
-    apps_path = os.path.join(artifacts_path, "applications.json")
+    apps_path = os.path.join(artifacts_path, "applications.cache")
     if not os.path.isfile(apps_path):
         print(f"❌ Applications file not found at {apps_path}")
         sys.exit(1)

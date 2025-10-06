@@ -44,6 +44,7 @@ pipeline {
                             --lt_token "${LT_TOKEN}" \
                             --lt_api_version "${LifeTimeAPIVersion}"
                     '''
+                    sh "ls -l ${env.ArtifactsFolder}"
                 }
             }
         }

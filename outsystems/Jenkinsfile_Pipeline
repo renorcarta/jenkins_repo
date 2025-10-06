@@ -34,6 +34,7 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip
+                    pip install requests
                     pip install outsystems-pipeline==${OSPackageVersion}
                     echo "[INFO] Python environment and packages are ready."
                 '''
